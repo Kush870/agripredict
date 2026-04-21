@@ -724,9 +724,9 @@ def get_rf_validation_curve():
         # Get validation curve for n_estimators
         param_range = [5, 10, 25, 50, 100, 200]
         train_scores, val_scores = validation_curve(
-            RandomForestRegressor(random_state=42, n_jobs=-1),
+            pipeline,
             X_train, y_train,
-            param_name='n_estimators',
+            param_name='model__n_estimators',
             param_range=param_range,
             cv=3, scoring='r2', n_jobs=-1
         )
@@ -764,9 +764,9 @@ def get_xgb_validation_curve():
         # Get validation curve for n_estimators
         param_range = [5, 10, 25, 50, 100, 200]
         train_scores, val_scores = validation_curve(
-            XGBRegressor(random_state=42, n_jobs=-1),
+            xgb_pipeline,
             X_train, y_train,
-            param_name='n_estimators',
+            param_name='model__n_estimators',
             param_range=param_range,
             cv=3, scoring='r2', n_jobs=-1
         )
@@ -783,6 +783,82 @@ def get_xgb_validation_curve():
     
     except Exception as e:
         print(f"XGB validation curve error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/chart-data/tuned-rf-learning-curve', methods=['GET'])
+def get_tuned_rf_learning_curve():
+    """Get learning curve data for Tuned Random Forest only"""
+    try:
+        if tuned_pipeline is None:
+            return jsonify({'error': 'Tuned Random Forest model not loaded'}), 500
+        
+        # Load dataset
+        df = pd.read_csv(DATASET_PATH)
+        target = 'Yield_tons_per_hectare'
+        X = df.drop(columns=[target])
+        y = df[target]
+        
+        # Prepare data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Get learning curve for Tuned RF
+        train_sizes, train_scores, val_scores = learning_curve(
+            tuned_pipeline, X_train, y_train, 
+            cv=5, scoring='r2', n_jobs=-1,
+            train_sizes=np.linspace(0.1, 1.0, 10)
+        )
+        
+        return jsonify({
+            'train_sizes': train_sizes.tolist(),
+            'train_scores_mean': train_scores.mean(axis=1).tolist(),
+            'train_scores_std': train_scores.std(axis=1).tolist(),
+            'val_scores_mean': val_scores.mean(axis=1).tolist(),
+            'val_scores_std': val_scores.std(axis=1).tolist(),
+            'model': 'Tuned Random Forest'
+        })
+    
+    except Exception as e:
+        print(f"Tuned RF learning curve error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/chart-data/tuned-rf-validation-curve', methods=['GET'])
+def get_tuned_rf_validation_curve():
+    """Get validation curve data for Tuned Random Forest n_estimators"""
+    try:
+        if tuned_pipeline is None:
+            return jsonify({'error': 'Tuned Random Forest model not loaded'}), 500
+        
+        # Load dataset
+        df = pd.read_csv(DATASET_PATH)
+        target = 'Yield_tons_per_hectare'
+        X = df.drop(columns=[target])
+        y = df[target]
+        
+        # Prepare data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Get validation curve for n_estimators
+        param_range = [5, 10, 25, 50, 100, 200]
+        train_scores, val_scores = validation_curve(
+            tuned_pipeline,
+            X_train, y_train,
+            param_name='model__n_estimators',
+            param_range=param_range,
+            cv=3, scoring='r2', n_jobs=-1
+        )
+        
+        return jsonify({
+            'param_range': param_range,
+            'train_scores_mean': train_scores.mean(axis=1).tolist(),
+            'train_scores_std': train_scores.std(axis=1).tolist(),
+            'val_scores_mean': val_scores.mean(axis=1).tolist(),
+            'val_scores_std': val_scores.std(axis=1).tolist(),
+            'param_name': 'n_estimators',
+            'model': 'Tuned Random Forest'
+        })
+    
+    except Exception as e:
+        print(f"Tuned RF validation curve error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/chart-data/model-comparison', methods=['GET'])
