@@ -373,8 +373,8 @@ def index():
 def predict():
     """Predict crop yield based on input features"""
     try:
-        if xgb_pipeline is None:
-            return jsonify({'error': 'XGBoost model not loaded'}), 500
+        if tuned_pipeline is None:
+            return jsonify({'error': 'Prediction model not loaded'}), 500
         
         data = request.json
         
@@ -385,8 +385,8 @@ def predict():
             'Crop': data.get('crop'),
             'Rainfall_mm': float(data.get('rainfall', 0)),
             'Temperature_Celsius': float(data.get('temperature', 0)),
-            'Fertilizer_Used': data.get('fertilizer', 'False'),
-            'Irrigation_Used': data.get('irrigation', 'False'),
+            'Fertilizer_Used': data.get('fertilizer', 'False').capitalize(),
+            'Irrigation_Used': data.get('irrigation', 'False').capitalize(),
             'Weather_Condition': data.get('weather_condition'),
             'Days_to_Harvest': int(data.get('days_to_harvest', 0))
         }
@@ -394,8 +394,8 @@ def predict():
         # Create DataFrame for prediction
         input_df = pd.DataFrame([features])
         
-        # Make prediction using XGBoost
-        prediction = xgb_pipeline.predict(input_df)[0]
+        # Make prediction using Tuned Random Forest
+        prediction = tuned_pipeline.predict(input_df)[0]
         
         # Generate insights
         insights = []
@@ -412,7 +412,7 @@ def predict():
             'prediction': round(float(prediction), 2),
             'insights': insights if insights else ["Growing conditions look favorable."],
             'unit': 'tons/hectare',
-            'model_used': 'XGBoost'
+            'model_used': 'Tuned Random Forest'
         })
     
     except Exception as e:
@@ -897,38 +897,3 @@ if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=5000)
 
 
-@app.route('/chart-data/tuned-rf-learning-curve', methods=['GET'])
-def get_tuned_rf_learning_curve():
-    try:
-        from sklearn.model_selection import learning_curve
-        import numpy as np
-        import pandas as pd
-        from sklearn.model_selection import train_test_split
-        if tuned_pipeline is None: return jsonify({'error': 'Tuned RF not loaded'}), 500
-        df = pd.read_csv(DATASET_PATH)
-        X = df.drop(columns=['Yield_tons_per_hectare'])
-        y = df['Yield_tons_per_hectare']
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        train_sizes, train_scores, val_scores = learning_curve(
-            tuned_pipeline, X_train, y_train, cv=3, scoring='r2', n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 5)
-        )
-        return jsonify({'train_sizes': train_sizes.tolist(), 'train_scores_mean': train_scores.mean(axis=1).tolist(), 'train_scores_std': train_scores.std(axis=1).tolist(), 'val_scores_mean': val_scores.mean(axis=1).tolist(), 'val_scores_std': val_scores.std(axis=1).tolist()})
-    except Exception as e: return jsonify({'error': str(e)}), 500
-
-@app.route('/chart-data/tuned-rf-validation-curve', methods=['GET'])
-def get_tuned_rf_validation_curve():
-    try:
-        from sklearn.model_selection import validation_curve
-        import pandas as pd
-        from sklearn.model_selection import train_test_split
-        if tuned_pipeline is None: return jsonify({'error': 'Tuned RF not loaded'}), 500
-        df = pd.read_csv(DATASET_PATH)
-        X = df.drop(columns=['Yield_tons_per_hectare'])
-        y = df['Yield_tons_per_hectare']
-        X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
-        param_range = [5, 10, 20]
-        train_scores, val_scores = validation_curve(
-            tuned_pipeline, X_train, y_train, param_name="model__n_estimators", param_range=param_range, cv=3, scoring="r2", n_jobs=-1
-        )
-        return jsonify({'param_range': param_range, 'train_scores_mean': train_scores.mean(axis=1).tolist(), 'train_scores_std': train_scores.std(axis=1).tolist(), 'val_scores_mean': val_scores.mean(axis=1).tolist(), 'val_scores_std': val_scores.std(axis=1).tolist()})
-    except Exception as e: return jsonify({'error': str(e)}), 500
