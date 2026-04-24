@@ -373,8 +373,8 @@ def index():
 def predict():
     """Predict crop yield based on input features"""
     try:
-        if tuned_pipeline is None:
-            return jsonify({'error': 'Prediction model not loaded'}), 500
+        if xgb_pipeline is None:
+            return jsonify({'error': 'XGBoost model not loaded'}), 500
         
         data = request.json
         
@@ -394,8 +394,8 @@ def predict():
         # Create DataFrame for prediction
         input_df = pd.DataFrame([features])
         
-        # Make prediction using Tuned Random Forest
-        prediction = tuned_pipeline.predict(input_df)[0]
+        # Make prediction using XGBoost
+        prediction = xgb_pipeline.predict(input_df)[0]
         
         # Generate insights
         insights = []
@@ -412,7 +412,7 @@ def predict():
             'prediction': round(float(prediction), 2),
             'insights': insights if insights else ["Growing conditions look favorable."],
             'unit': 'tons/hectare',
-            'model_used': 'Tuned Random Forest'
+            'model_used': 'XGBoost'
         })
     
     except Exception as e:
